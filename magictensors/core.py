@@ -17,15 +17,25 @@ class _MagicBehavior:
 
 
 class MagicTensor(torch.Tensor):
+    @staticmethod 
+    def __new__(cls, x, *args, **kwargs):
+        if '_behaviors' in kwargs:
+            kwargs.pop('_behaviors')
+        return super().__new__(cls, x, *args, **kwargs)
+    
     def __init__(self, data, _behaviors=None, **kwargs):
-        super().__init__(data, **kwargs)
         self._behaviors = _behaviors or set()
-
+    
+    def __repr__(self):
+        return "MagicTensor\n" + torch.Tensor(self).__repr__()
+    
     @classmethod
     def __torch_function__(cls, func, types, args=(), kwargs=None):
+        if func == cls.__repr__:
+            return func(torch.Tensor(args[0]))
         if kwargs is None:
             kwargs = {}
-        behaviors_list = a._behaviors if hasattr(a, '_behaviors') else set() for a in args
+        behaviors_list = (a._behaviors if hasattr(a, '_behaviors') else set() for a in args)
         for arg_behaviors in behaviors_list:
             for behavior in arg_behaviors:
                 key, value = behavior
