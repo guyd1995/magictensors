@@ -1,3 +1,4 @@
+from functools import reduce
 import torch
 from torch import nn
 # from koila import LazyTensor as KoilaTensor
@@ -9,7 +10,7 @@ class _MagicBehavior:
         self.value = value
 
     def __iter__(self):
-        return self.key, self.value
+        return iter([self.key, self.value])
 
     @staticmethod
     def make_func_behavior(orig_func, new_func):
@@ -29,13 +30,16 @@ class MagicTensor(torch.Tensor):
     def __repr__(self):
         return "MagicTensor\n" + torch.Tensor(self).__repr__()
     
+    def override_function(self, orig_func, new_func):
+        self._behaviors.add(_MagicBehavior(_MagicBehavior.FUNC_BEHAVIOR, (orig_func, new_func)))
+    
     @classmethod
     def __torch_function__(cls, func, types, args=(), kwargs=None):
         if func == cls.__repr__:
             return func(torch.Tensor(args[0]))
         if kwargs is None:
             kwargs = {}
-        behaviors_list = (a._behaviors if hasattr(a, '_behaviors') else set() for a in args)
+        behaviors_list = [a._behaviors if hasattr(a, '_behaviors') else set() for a in args]
         for arg_behaviors in behaviors_list:
             for behavior in arg_behaviors:
                 key, value = behavior
@@ -47,5 +51,5 @@ class MagicTensor(torch.Tensor):
                     raise NotImplementedError
 
         ret = super().__torch_function__(func, types, args, kwargs)
-        final_behaviors = sum(behaviors_list, set())
+        final_behaviors = reduce(lambda x, y: x | y, behaviors_list, set())
         return MagicTensor(ret, _behaviors=final_behaviors)
